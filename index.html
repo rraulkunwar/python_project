@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Data Dashboard</title>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+        google.charts.load('current', { 'packages': ['corechart'] });
+        google.charts.setOnLoadCallback(drawCharts);
+
+        function drawCharts() {
+            $.ajax({
+                url: '/api/data',
+                dataType: 'json',
+                success: function (data) {
+                    drawBarChart(data);
+                    drawPieChart(data);
+                    drawColumnChart(data);
+                }
+            });
+        }
+
+        function drawBarChart(data) {
+            var marketCapUsd = {};
+
+            for (var i = 0; i < data.length; i++) {
+                var name = data[i].name;
+                marketCapUsd[name] = (marketCapUsd[name] || 0) + parseFloat(data[i].marketCapUsd);
+            }
+
+            var chartData = [['Cryptocurrency Name', 'Mean Market Cap (USD)']];
+            for (var name in marketCapUsd) {
+                chartData.push([name, marketCapUsd[name] / data.filter(item => item.name === name).length]);
+            }
+
+            chartData.sort((a, b) => b[1] - a[1]);
+            chartData = chartData.slice(0, 11);
+
+            var chartDataTable = google.visualization.arrayToDataTable(chartData);
+
+            var options = {
+                title: 'Top 10 Cryptocurrencies by Mean Market Cap (USD)',
+                chartArea: { width: '70%', height: '70%' }, // Increase chart area
+                hAxis: { title: 'Cryptocurrency Name' },
+                vAxis: { title: 'Mean Market Cap (USD)' }
+            };
+
+            var chart = new google.visualization.ColumnChart(document.getElementById('bar_chart_div'));
+            chart.draw(chartDataTable, options);
+        }
+
+        function drawPieChart(data) {
+            var volumeUsd24Hr = {};
+
+            // Process the data
+            for (var i = 0; i < data.length; i++) {
+                var name = data[i].name;
+                volumeUsd24Hr[name] = (volumeUsd24Hr[name] || 0) + parseFloat(data[i].volumeUsd24Hr);
+            }
+
+            // Convert volumeUsd24Hr to an array of arrays
+            var volumeArray = [];
+            for (var name in volumeUsd24Hr) {
+                volumeArray.push([name, volumeUsd24Hr[name]]);
+            }
+
+            // Sort the array by volume in descending order
+            volumeArray.sort((a, b) => b[1] - a[1]);
+
+            // Take the top 5 and group all others into an "Others" category
+            var othersSum = 0;
+            for (var i = 5; i < volumeArray.length; i++) {
+                othersSum += volumeArray[i][1];
+            }
+            volumeArray = volumeArray.slice(0, 5);
+            volumeArray.push(['Others', othersSum]);
+
+            // Add the header to the beginning of the array
+            volumeArray.unshift(['Cryptocurrency Name', '24Hr Volume (USD)']);
+
+            var chartDataTable = google.visualization.arrayToDataTable(volumeArray);
+
+            // Chart options
+            var options = {
+                title: 'Top 5 Cryptocurrencies by 24Hr Trading Volume',
+                chartArea: { width: '70%', height: '70%' }, // Increase chart area
+            };
+
+            // Create and draw the chart
+            var chart = new google.visualization.PieChart(document.getElementById('pie_chart_div'));
+            chart.draw(chartDataTable, options);
+        }
+
+        // Function to handle UI changes based on user selection
+        function handleUserSelection() {
+            var selectedOption = $('#api-endpoint').val();
+
+            // Hide all input boxes initially
+            $('#user-input-group, #start-input-box, #end-input-box').hide();
+
+            // Show input boxes based on user selection
+            if (selectedOption === 'id') {
+                $('#user-input-group').show();
+            } else if (selectedOption === 'range') {
+                $('#start-input-box, #end-input-box').show();
+            }
+        }
+        $(document).ready(function () {
+		// Call handleUserSelection on document ready
+                 handleUserSelection();
+            });
+
+        function drawColumnChart(data) {
+            var performance = [];
+
+            // Process the data
+            for (var i = 0; i < data.length; i++) {
+                var name = data[i].name;
+                var marketCapUsd = parseFloat(data[i].marketCapUsd);
+                var changePercent24Hr = parseFloat(data[i].changePercent24Hr);
+
+                // Check if the cryptocurrency is already in the performance array
+                var alreadyExists = performance.some(function(el) {
+                    return el.name === name;
+                });
+
+                // If the cryptocurrency is not in the performance array, add it
+                if (!alreadyExists) {
+                    performance.push({ name: name, marketCapUsd: marketCapUsd, changePercent24Hr: changePercent24Hr });
+                }
+            }
+
+            // Sort the array by marketCapUsd in descending order and take the top 10
+            performance.sort((a, b) => b.marketCapUsd - a.marketCapUsd);
+            performance = performance.slice(0, 10);
+
+            // Convert performance to chartData
+            var chartData = [['Cryptocurrency Name', 'Change (24Hr)']];
+            for (var i = 0; i < performance.length; i++) {
+                chartData.push([performance[i].name, performance[i].changePercent24Hr]);
+            }
+
+            var chartDataTable = google.visualization.arrayToDataTable(chartData);
+
+            // Chart options
+            var options = {
+                title: '24Hr Change of Top 10 Cryptocurrencies by Market Cap',
+                chartArea: { width: '70%', height: '70%' }, // Increase chart area
+                vAxis: { title: 'Change (24Hr)', minValue: -10 },
+                hAxis: { title: 'Cryptocurrency Name' }
+            };
+
+            // Create and draw the chart
+            var chart = new google.visualization.ColumnChart(document.getElementById('column_chart_div'));
+            chart.draw(chartDataTable, options);
+        }
+
+        // Function to handle UI changes based on user selection
+        function handleUserSelection() {
+            var selectedOption = $('#api-endpoint').val();
+
+            // Hide all input boxes initially
+            $('#user-input-group, #start-input-box, #end-input-box').hide();
+
+            // Show input boxes based on user selection
+            if (selectedOption === 'id') {
+                $('#user-input-group').show();
+            } else if (selectedOption === 'range') {
+                $('#start-input-box, #end-input-box').show();
+            }
+        }
+        $(document).ready(function () {
+		// Call handleUserSelection on document ready
+                 handleUserSelection();
+            });
+
+        // Function to handle API request based on user input
+        function handleApiRequest() {
+            var apiEndpoint = $('#api-endpoint').val();
+            var userInput = $('#user-input').val();
+            var startInput = $('#start-input').val();
+            var endInput = $('#end-input').val();
+            console.log(userInput)
+
+            var apiUrl = '/api/data';
+
+            if (apiEndpoint === 'range') {
+                apiUrl = '/api/data/range?start_price=' + startInput + '&end_price=' + endInput;
+            } else if (apiEndpoint === 'id') {
+                apiUrl = '/api/data/' + userInput;
+            }
+
+            // Fetch data using AJAX
+            $.ajax({
+                url: apiUrl,
+                dataType: 'json',
+                success: function (data) {
+
+                    console.log(data+"\\")
+
+                    // Update the table
+                    updateResultTable(data);
+                }
+            });
+        }
+
+        function updateResultTable(data) {
+            // Clear existing table content
+            $('#result-table').empty();
+
+            // Create a new table element with Bootstrap classes
+            var table = $('<table class="table table-bordered table-striped"></table>');
+
+            // Add table headers with Bootstrap classes
+            var thead = $('<thead class="thead-dark"><tr><th>Rank</th><th>Name</th><th>Symbol</th><th>Supply</th><th>Max Supply</th><th>Market Cap USD</th><th>Volume USD 24Hr</th><th>Price USD</th><th>Change Percent 24Hr</th></tr></thead>');
+            table.append(thead);
+
+            // Add table rows with data
+            var tbody = $('<tbody></tbody>');
+
+            if (Array.isArray(data)) {
+                // If data is an array (multiple items)
+                // Sort the data array by rank
+                data.sort(function(a, b) {
+                    return a.rank - b.rank;
+                });
+
+                for (var i = 0; i < data.length; i++) {
+                    var row = $('<tr></tr>');
+                    row.append('<td>' + data[i].rank + '</td>');
+                    row.append('<td>' + data[i].name + '</td>');
+                    row.append('<td>' + data[i].symbol + '</td>');
+                    row.append('<td>' + data[i].supply + '</td>');
+                    row.append('<td>' + data[i].maxSupply + '</td>');
+                    row.append('<td>' + data[i].marketCapUsd + '</td>');
+                    row.append('<td>' + data[i].volumeUsd24Hr + '</td>');
+                    row.append('<td>' + data[i].priceUsd + '</td>');
+                    row.append('<td>' + data[i].changePercent24Hr + '</td>');
+
+                    // Add alternating black and white colors
+                    row.addClass(i % 2 === 0 ? 'table-light' : 'table-dark');
+
+                    tbody.append(row);
+                }
+            } else if (typeof data === 'object') {
+                // If data is a single object
+                var row = $('<tr></tr>');
+                row.append('<td>' + data.rank + '</td>');
+                row.append('<td>' + data.name + '</td>');
+                row.append('<td>' + data.symbol + '</td>');
+                row.append('<td>' + data.supply + '</td>');
+                row.append('<td>' + data.maxSupply + '</td>');
+                row.append('<td>' + data.marketCapUsd + '</td>');
+                row.append('<td>' + data.volumeUsd24Hr + '</td>');
+                row.append('<td>' + data.priceUsd + '</td>');
+                row.append('<td>' + data.changePercent24Hr + '</td>');
+
+                tbody.append(row);
+            }
+
+            table.append(tbody);
+
+            // Append the table to the result-table div
+            $('#result-table').append(table);
+        }
+
+
+    </script>
+    <style>
+        body {
+            background-color: #f1f1f1; /* Light Blue Background */
+        }
+
+        .chart-layer {
+            background-color: white; /* White Background for Chart Layers */
+            padding: 20px; /* Add some padding for better aesthetics */
+            margin-bottom: 20px; /* Add margin at the bottom */
+        }
+
+        .table tbody tr.table-dark:nth-child(odd) {
+            background-color: #343a40; /* Dark Gray Background for Odd Rows */
+        }
+
+        .table tbody tr.table-light:nth-child(even) {
+            background-color: #f8f9fa; /* Light Gray Background for Even Rows */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container mt-5">
+        <h1 class="mb-4">Crypto Currency Dashboard</h1>
+
+        <!-- Input fields for interacting with API -->
+        <div class="form-group row">
+            <label for="api-endpoint" class="col-sm-2 col-form-label">API Endpoint:</label>
+            <div class="col-sm-4">
+                <select class="form-control" id="api-endpoint" onchange="handleUserSelection()">
+                    <option value="all">Get all Crypto Coins</option>
+                    <option value="range">Get Crypto Coins by Price USD Range</option>
+                    <option value="id">Get Crypto Coin by Name</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Input box for Crypto Name -->
+        <div class="form-group row" id="user-input-group" style="display: none;">
+            <label for="user-input" class="col-sm-2 col-form-label">User Input:</label>
+            <div class="col-sm-4">
+                <input type="text" class="form-control" id="user-input" placeholder="Enter Crypto Name">
+            </div>
+        </div>
+
+        <!-- Input boxes for Range -->
+        <div class="form-group row" id="start-input-box">
+            <label for="start-input" class="col-sm-2 col-form-label">Start Price USD:</label>
+            <div class="col-sm-4">
+                <input type="text" class="form-control" id="start-input" placeholder="Start priceUsd">
+            </div>
+        </div>
+
+        <div class="form-group row" id="end-input-box">
+            <label for="end-input" class="col-sm-2 col-form-label">End Price USD:</label>
+            <div class="col-sm-4">
+                <input type="text" class="form-control" id="end-input" placeholder="End priceUsd">
+            </div>
+        </div>
+
+        <div class="form-group row">
+            <div class="col-sm-6">
+                <button type="button" class="btn btn-primary" onclick="handleApiRequest()">Submit</button>
+            </div>
+        </div>
+
+        <!-- Placeholder for the table -->
+        <div id="result-table" class="mt-4"></div>
+        
+        <!-- Bar Chart -->
+        <div class="chart-layer mb-5">
+            <div id="bar_chart_div" style="width: 100%; height: 500px;"></div>
+        </div>
+
+        <!-- Pie Chart -->
+        <div class="chart-layer mb-5">
+            <div id="pie_chart_div" style="width: 100%; height: 500px;"></div>
+        </div>
+
+        <!-- Column Chart -->
+        <div class="chart-layer mb-5">
+            <div id="column_chart_div" style="width: 100%; height: 500px;"></div>
+        </div>
+    </div>
+</body>
+</html>
